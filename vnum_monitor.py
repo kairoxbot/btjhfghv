@@ -36,7 +36,7 @@ def _start_health_server():
 
 # ─── CONFIG ───────────────────────────────────────────────────────────────────
 WEBHOOK_URL    = os.getenv("DISCORD_WEBHOOK", "PEGA_TU_WEBHOOK_AQUI")
-CHECK_INTERVAL = int(os.getenv("CHECK_INTERVAL", "60"))
+CHECK_INTERVAL = int(os.getenv("CHECK_INTERVAL", "").strip() or "60")
 DATA_FILE      = "seen.json"
 BOT_NAME       = "NumBot 🔢"
 REDIS_URL      = os.getenv("REDIS_URL")
@@ -284,11 +284,10 @@ async def main() -> None:
         datefmt = "%H:%M:%S",
     )
 
-    _start_health_server()
-
     if WEBHOOK_URL == "PEGA_TU_WEBHOOK_AQUI":
-        logging.error("Configura DISCORD_WEBHOOK en las env vars de Render.")
-        return
+        logging.error("DISCORD_WEBHOOK no configurado — setealo en las env vars.")
+        while True:
+            await asyncio.sleep(60)
 
     redis_client: aioredis.Redis | None = None
     if REDIS_URL:
@@ -337,7 +336,13 @@ async def main() -> None:
 
 
 if __name__ == "__main__":
+    _start_health_server()
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
         logging.info("Detenido.")
+    except Exception as exc:
+        logging.error(f"Error fatal: {exc}")
+    # mantener el proceso vivo para back4app aunque el loop falle
+    while True:
+        import time; time.sleep(60)
