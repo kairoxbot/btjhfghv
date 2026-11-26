@@ -9,10 +9,29 @@ import logging
 import os
 import re
 import random
+import threading
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from bs4 import BeautifulSoup
 import redis.asyncio as aioredis
+
+
+# ─── HEALTH SERVER (back4app necesita un puerto HTTP activo) ──────────────────
+class _Health(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b"ok")
+    def log_message(self, *args):
+        pass  # silenciar logs del servidor
+
+def _start_health_server():
+    port = int(os.getenv("PORT", "8080"))
+    server = HTTPServer(("0.0.0.0", port), _Health)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    logging.info(f"Health server en :{port}")
 
 
 # ─── CONFIG ───────────────────────────────────────────────────────────────────
@@ -264,6 +283,8 @@ async def main() -> None:
         format  = "[%(asctime)s] %(levelname)s — %(message)s",
         datefmt = "%H:%M:%S",
     )
+
+    _start_health_server()
 
     if WEBHOOK_URL == "PEGA_TU_WEBHOOK_AQUI":
         logging.error("Configura DISCORD_WEBHOOK en las env vars de Render.")
